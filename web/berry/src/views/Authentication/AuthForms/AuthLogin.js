@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 
-// material-ui
 import { useTheme } from '@mui/material/styles';
 import {
   Box,
@@ -20,16 +19,13 @@ import {
   useMediaQuery
 } from '@mui/material';
 
-// third party
 import * as Yup from 'yup';
 import { Formik } from 'formik';
 
-// project imports
 import useLogin from 'hooks/useLogin';
 import AnimateButton from 'ui-component/extended/AnimateButton';
 import WechatModal from 'views/Authentication/AuthForms/WechatModal';
 
-// assets
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
@@ -39,8 +35,6 @@ import Lark from 'assets/images/icons/lark.svg';
 import OIDC from 'assets/images/icons/oidc.svg';
 import { onGitHubOAuthClicked, onLarkOAuthClicked, onOidcClicked } from 'utils/common';
 
-// ============================|| FIREBASE - LOGIN ||============================ //
-
 const LoginForm = ({ ...others }) => {
   const theme = useTheme();
   const { login, wechatLogin } = useLogin();
@@ -48,12 +42,9 @@ const LoginForm = ({ ...others }) => {
   const matchDownSM = useMediaQuery(theme.breakpoints.down('md'));
   const customization = useSelector((state) => state.customization);
   const siteInfo = useSelector((state) => state.siteInfo);
-  // const [checked, setChecked] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
-  let tripartiteLogin = false;
-  if (siteInfo.github_oauth || siteInfo.wechat_login || siteInfo.lark_client_id || siteInfo.oidc) {
-    tripartiteLogin = true;
-  }
+  const tripartiteLogin = Boolean(siteInfo.github_oauth || siteInfo.wechat_login || siteInfo.lark_client_id || siteInfo.oidc);
 
   const handleWechatOpen = () => {
     setOpenWechat(true);
@@ -63,9 +54,8 @@ const LoginForm = ({ ...others }) => {
     setOpenWechat(false);
   };
 
-  const [showPassword, setShowPassword] = useState(false);
   const handleClickShowPassword = () => {
-    setShowPassword(!showPassword);
+    setShowPassword((value) => !value);
   };
 
   const handleMouseDownPassword = (event) => {
@@ -94,7 +84,7 @@ const LoginForm = ({ ...others }) => {
                   <Box sx={{ mr: { xs: 1, sm: 2, width: 20 }, display: 'flex', alignItems: 'center' }}>
                     <img src={Github} alt="github" width={25} height={25} style={{ marginRight: matchDownSM ? 8 : 16 }} />
                   </Box>
-                  使用 GitHub 登录
+                  Sign in with GitHub
                 </Button>
               </AnimateButton>
             </Grid>
@@ -115,9 +105,9 @@ const LoginForm = ({ ...others }) => {
                   }}
                 >
                   <Box sx={{ mr: { xs: 1, sm: 2, width: 20 }, display: 'flex', alignItems: 'center' }}>
-                    <img src={Wechat} alt="Wechat" width={25} height={25} style={{ marginRight: matchDownSM ? 8 : 16 }} />
+                    <img src={Wechat} alt="wechat" width={25} height={25} style={{ marginRight: matchDownSM ? 8 : 16 }} />
                   </Box>
-                  使用微信登录
+                  Sign in with WeChat
                 </Button>
               </AnimateButton>
               <WechatModal open={openWechat} handleClose={handleWechatClose} wechatLogin={wechatLogin} qrCode={siteInfo.wechat_qrcode} />
@@ -139,9 +129,9 @@ const LoginForm = ({ ...others }) => {
                   }}
                 >
                   <Box sx={{ mr: { xs: 1, sm: 2, width: 20 }, display: 'flex', alignItems: 'center' }}>
-                    <img src={Lark} alt="Lark" width={25} height={25} style={{ marginRight: matchDownSM ? 8 : 16 }} />
+                    <img src={Lark} alt="lark" width={25} height={25} style={{ marginRight: matchDownSM ? 8 : 16 }} />
                   </Box>
-                  使用飞书登录
+                  Sign in with Lark
                 </Button>
               </AnimateButton>
             </Grid>
@@ -152,7 +142,7 @@ const LoginForm = ({ ...others }) => {
                 <Button
                   disableElevation
                   fullWidth
-                  onClick={() => onOidcClicked(siteInfo.oidc_authorization_endpoint,siteInfo.oidc_client_id)}
+                  onClick={() => onOidcClicked(siteInfo.oidc_authorization_endpoint, siteInfo.oidc_client_id)}
                   size="large"
                   variant="outlined"
                   sx={{
@@ -162,22 +152,16 @@ const LoginForm = ({ ...others }) => {
                   }}
                 >
                   <Box sx={{ mr: { xs: 1, sm: 2, width: 20 }, display: 'flex', alignItems: 'center' }}>
-                    <img src={OIDC} alt="Lark" width={25} height={25} style={{ marginRight: matchDownSM ? 8 : 16 }} />
+                    <img src={OIDC} alt="oidc" width={25} height={25} style={{ marginRight: matchDownSM ? 8 : 16 }} />
                   </Box>
-                  使用 OIDC 登录
+                  Sign in with OIDC
                 </Button>
               </AnimateButton>
             </Grid>
           )}
           <Grid item xs={12}>
-            <Box
-              sx={{
-                alignItems: 'center',
-                display: 'flex'
-              }}
-            >
+            <Box sx={{ alignItems: 'center', display: 'flex' }}>
               <Divider sx={{ flexGrow: 1 }} orientation="horizontal" />
-
               <Button
                 variant="outlined"
                 sx={{
@@ -186,7 +170,7 @@ const LoginForm = ({ ...others }) => {
                   py: 0.5,
                   px: 7,
                   borderColor: `${theme.palette.grey[100]} !important`,
-                  color: `${theme.palette.grey[900]}!important`,
+                  color: `${theme.palette.grey[900]} !important`,
                   fontWeight: 500,
                   borderRadius: `${customization.borderRadius}px`
                 }}
@@ -195,7 +179,6 @@ const LoginForm = ({ ...others }) => {
               >
                 OR
               </Button>
-
               <Divider sx={{ flexGrow: 1 }} orientation="horizontal" />
             </Box>
           </Grid>
@@ -206,6 +189,7 @@ const LoginForm = ({ ...others }) => {
         initialValues={{
           username: '',
           password: '',
+          otp_code: '',
           submit: null
         }}
         validationSchema={Yup.object().shape({
@@ -213,7 +197,7 @@ const LoginForm = ({ ...others }) => {
           password: Yup.string().max(255).required('Password is required')
         })}
         onSubmit={async (values, { setErrors, setStatus, setSubmitting }) => {
-          const { success, message } = await login(values.username, values.password);
+          const { success, message } = await login(values.username, values.password, values.otp_code);
           if (success) {
             setStatus({ success: true });
           } else {
@@ -228,7 +212,7 @@ const LoginForm = ({ ...others }) => {
         {({ errors, handleBlur, handleChange, handleSubmit, isSubmitting, touched, values }) => (
           <form noValidate onSubmit={handleSubmit} {...others}>
             <FormControl fullWidth error={Boolean(touched.username && errors.username)} sx={{ ...theme.typography.customInput }}>
-              <InputLabel htmlFor="outlined-adornment-username-login">用户名 / 邮箱</InputLabel>
+              <InputLabel htmlFor="outlined-adornment-username-login">Username / Email</InputLabel>
               <OutlinedInput
                 id="outlined-adornment-username-login"
                 type="text"
@@ -236,7 +220,7 @@ const LoginForm = ({ ...others }) => {
                 name="username"
                 onBlur={handleBlur}
                 onChange={handleChange}
-                label="用户名"
+                label="Username / Email"
                 inputProps={{ autoComplete: 'username' }}
               />
               {touched.username && errors.username && (
@@ -247,7 +231,7 @@ const LoginForm = ({ ...others }) => {
             </FormControl>
 
             <FormControl fullWidth error={Boolean(touched.password && errors.password)} sx={{ ...theme.typography.customInput }}>
-              <InputLabel htmlFor="outlined-adornment-password-login">密码</InputLabel>
+              <InputLabel htmlFor="outlined-adornment-password-login">Password</InputLabel>
               <OutlinedInput
                 id="outlined-adornment-password-login"
                 type={showPassword ? 'text' : 'password'}
@@ -276,13 +260,22 @@ const LoginForm = ({ ...others }) => {
                 </FormHelperText>
               )}
             </FormControl>
+
+            <FormControl fullWidth sx={{ ...theme.typography.customInput }}>
+              <InputLabel htmlFor="outlined-adornment-otp-login">Authenticator Code</InputLabel>
+              <OutlinedInput
+                id="outlined-adornment-otp-login"
+                type="text"
+                value={values.otp_code}
+                name="otp_code"
+                onBlur={handleBlur}
+                onChange={handleChange}
+                label="Authenticator Code"
+                inputProps={{ autoComplete: 'one-time-code' }}
+              />
+            </FormControl>
+
             <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-              {/* <FormControlLabel
-                control={
-                  <Checkbox checked={checked} onChange={(event) => setChecked(event.target.checked)} name="checked" color="primary" />
-                }
-                label="记住我"
-              /> */}
               <Typography
                 component={Link}
                 to="/reset"
@@ -290,9 +283,10 @@ const LoginForm = ({ ...others }) => {
                 color="primary"
                 sx={{ textDecoration: 'none', cursor: 'pointer' }}
               >
-                忘记密码?
+                Forgot password?
               </Typography>
             </Stack>
+
             {errors.submit && (
               <Box sx={{ mt: 3 }}>
                 <FormHelperText error>{errors.submit}</FormHelperText>
@@ -302,7 +296,7 @@ const LoginForm = ({ ...others }) => {
             <Box sx={{ mt: 2 }}>
               <AnimateButton>
                 <Button disableElevation disabled={isSubmitting} fullWidth size="large" type="submit" variant="contained" color="primary">
-                  登录
+                  Login
                 </Button>
               </AnimateButton>
             </Box>

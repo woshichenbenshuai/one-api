@@ -731,9 +731,9 @@
   },
   "footer": {
     "built_by": "由",
-    "built_by_name": "JustSong",
+    "built_by_name": "",
     "license": "构建，源代码遵循",
-    "mit": "MIT 协议"
+    "mit": ""
   },
   "home": {
     "welcome": {
@@ -818,7 +818,7 @@
       "password_length": "密码长度不得小于 8 位！",
       "password_mismatch": "两次输入的密码不一致",
       "turnstile_wait": "请稍后几秒重试，Turnstile 正在检查用户环境！",
-      "root_password": "请立刻修改默认密码！"
+      "root_password": ""
     },
     "notice": {
       "password_copied": "新密码已复制到剪贴板：{{password}}"

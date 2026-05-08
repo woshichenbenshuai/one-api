@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
@@ -25,8 +26,25 @@ func CreateRootAccountIfNeed() error {
 	var user User
 	//if user.Status != util.UserStatusEnabled {
 	if err := DB.First(&user).Error; err != nil {
-		logger.SysLog("no user exists, creating a root user for you: username is root, password is 123456")
-		hashedPassword, err := common.Password2Hash("123456")
+		if config.InitialRootUsername == "" || config.InitialRootPassword == "" {
+			return errors.New("no user exists; set INITIAL_ROOT_USERNAME and INITIAL_ROOT_PASSWORD to bootstrap the root account")
+		}
+		if len(config.InitialRootUsername) > 12 {
+			return errors.New("INITIAL_ROOT_USERNAME must be at most 12 characters")
+		}
+		if len(config.InitialRootPassword) < 8 || len(config.InitialRootPassword) > 20 {
+			return errors.New("INITIAL_ROOT_PASSWORD must be between 8 and 20 characters")
+		}
+		authenticatorSecret := ""
+		if config.InitialRootAuthenticatorSecret != "" {
+			var validateErr error
+			authenticatorSecret, validateErr = common.ValidateAuthenticatorSecret(config.InitialRootAuthenticatorSecret)
+			if validateErr != nil {
+				return validateErr
+			}
+		}
+		logger.SysLogf("no user exists, creating root user from environment: username is %s", config.InitialRootUsername)
+		hashedPassword, err := common.Password2Hash(config.InitialRootPassword)
 		if err != nil {
 			return err
 		}
@@ -35,13 +53,15 @@ func CreateRootAccountIfNeed() error {
 			accessToken = config.InitialRootAccessToken
 		}
 		rootUser := User{
-			Username:    "root",
-			Password:    hashedPassword,
-			Role:        RoleRootUser,
-			Status:      UserStatusEnabled,
-			DisplayName: "Root User",
-			AccessToken: accessToken,
-			Quota:       500000000000000,
+			Username:             config.InitialRootUsername,
+			Password:             hashedPassword,
+			Role:                 RoleRootUser,
+			Status:               UserStatusEnabled,
+			DisplayName:          config.InitialRootDisplayName,
+			AccessToken:          accessToken,
+			AuthenticatorSecret:  authenticatorSecret,
+			AuthenticatorEnabled: authenticatorSecret != "",
+			Quota:                500000000000000,
 		}
 		DB.Create(&rootUser)
 		if config.InitialRootToken != "" {

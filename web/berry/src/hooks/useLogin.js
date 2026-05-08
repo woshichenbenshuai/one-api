@@ -7,11 +7,12 @@ import { showSuccess } from 'utils/common';
 const useLogin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const login = async (username, password) => {
+  const login = async (username, password, otpCode = '') => {
     try {
       const res = await API.post(`/api/user/login`, {
         username,
-        password
+        password,
+        otp_code: otpCode
       });
       const { success, message, data } = res.data;
       if (success) {

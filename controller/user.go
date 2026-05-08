@@ -21,6 +21,7 @@ import (
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	OTPCode  string `json:"otp_code"`
 }
 
 func Login(c *gin.Context) {
@@ -60,6 +61,15 @@ func Login(c *gin.Context) {
 			"success": false,
 		})
 		return
+	}
+	if user.AuthenticatorEnabled {
+		if !common.VerifyAuthenticatorCode(user.AuthenticatorSecret, loginRequest.OTPCode) {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Authenticator verification code is invalid",
+				"success": false,
+			})
+			return
+		}
 	}
 	SetupLogin(&user, c)
 }

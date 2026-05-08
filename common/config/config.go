@@ -154,6 +154,14 @@ var InitialRootToken = os.Getenv("INITIAL_ROOT_TOKEN")
 
 var InitialRootAccessToken = os.Getenv("INITIAL_ROOT_ACCESS_TOKEN")
 
+var InitialRootUsername = env.String("INITIAL_ROOT_USERNAME", "")
+
+var InitialRootPassword = env.String("INITIAL_ROOT_PASSWORD", "")
+
+var InitialRootDisplayName = env.String("INITIAL_ROOT_DISPLAY_NAME", "Root User")
+
+var InitialRootAuthenticatorSecret = env.String("INITIAL_ROOT_AUTHENTICATOR_SECRET", "")
+
 var GeminiVersion = env.String("GEMINI_VERSION", "v1")
 
 var OnlyOneLogFile = env.Bool("ONLY_ONE_LOG_FILE", false)

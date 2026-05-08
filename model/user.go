@@ -45,6 +45,8 @@ type User struct {
 	OidcId           string `json:"oidc_id" gorm:"column:oidc_id;index"`
 	VerificationCode string `json:"verification_code" gorm:"-:all"`                                    // this field is only for Email verification, don't save it to database!
 	AccessToken      string `json:"access_token" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
+	AuthenticatorSecret  string `json:"-" gorm:"type:varchar(64);column:authenticator_secret;default:''"`
+	AuthenticatorEnabled bool   `json:"authenticator_enabled" gorm:"column:authenticator_enabled;default:false"`
 	Quota            int64  `json:"quota" gorm:"bigint;default:0"`
 	UsedQuota        int64  `json:"used_quota" gorm:"bigint;default:0;column:used_quota"` // used quota
 	RequestCount     int    `json:"request_count" gorm:"type:int;default:0;"`             // request number
@@ -128,6 +130,7 @@ func (user *User) Insert(ctx context.Context, inviterId int) error {
 	user.Quota = config.QuotaForNewUser
 	user.AccessToken = random.GetUUID()
 	user.AffCode = random.GetRandomString(4)
+	user.AuthenticatorSecret = common.NormalizeAuthenticatorSecret(user.AuthenticatorSecret)
 	result := DB.Create(user)
 	if result.Error != nil {
 		return result.Error

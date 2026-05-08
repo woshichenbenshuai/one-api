@@ -14,7 +14,7 @@ import {
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { UserContext } from '../context/User';
-import { API, getLogo, showError, showSuccess, showWarning } from '../helpers';
+import { API, getLogo, showError, showSuccess } from '../helpers';
 import { onGitHubOAuthClicked, onLarkOAuthClicked } from './utils';
 import larkIcon from '../images/lark.svg';
 
@@ -23,11 +23,12 @@ const LoginForm = () => {
   const [inputs, setInputs] = useState({
     username: '',
     password: '',
+    otp_code: '',
     wechat_verification_code: '',
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
-  const { username, password } = inputs;
+  const { username, password, otp_code } = inputs;
   const [userState, userDispatch] = useContext(UserContext);
   let navigate = useNavigate();
   const [status, setStatus] = useState({});
@@ -77,19 +78,14 @@ const LoginForm = () => {
       const res = await API.post(`/api/user/login`, {
         username,
         password,
+        otp_code,
       });
       const { success, message, data } = res.data;
       if (success) {
         userDispatch({ type: 'login', payload: data });
         localStorage.setItem('user', JSON.stringify(data));
-        if (username === 'root' && password === '123456') {
-          navigate('/user/edit');
-          showSuccess(t('messages.success.login'));
-          showWarning(t('messages.error.root_password'));
-        } else {
-          navigate('/token');
-          showSuccess(t('messages.success.login'));
-        }
+        navigate('/token');
+        showSuccess(t('messages.success.login'));
       } else {
         showError(message);
       }
@@ -134,6 +130,16 @@ const LoginForm = () => {
                 name='password'
                 type='password'
                 value={password}
+                onChange={handleChange}
+                style={{ marginBottom: '1.5em' }}
+              />
+              <Form.Input
+                fluid
+                icon='shield alternate'
+                iconPosition='left'
+                placeholder='Authenticator Code'
+                name='otp_code'
+                value={otp_code}
                 onChange={handleChange}
                 style={{ marginBottom: '1.5em' }}
               />

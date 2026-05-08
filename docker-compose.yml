@@ -12,13 +12,17 @@ services:
       - ./data/oneapi:/data
       - ./logs:/app/logs
     environment:
-      - SQL_DSN=oneapi:123456@tcp(db:3306)/one-api  # 修改此行，或注释掉以使用 SQLite 作为数据库
+      - SQL_DSN=oneapi:123456@tcp(db:3306)/one-api
       - REDIS_CONN_STRING=redis://redis
-      - SESSION_SECRET=random_string  # 修改为随机字符串
+      - SESSION_SECRET=random_string
+      - INITIAL_ROOT_USERNAME=${INITIAL_ROOT_USERNAME}
+      - INITIAL_ROOT_PASSWORD=${INITIAL_ROOT_PASSWORD}
+#     - INITIAL_ROOT_DISPLAY_NAME=Root User
+#     - INITIAL_ROOT_AUTHENTICATOR_SECRET=
       - TZ=Asia/Shanghai
-#      - NODE_TYPE=slave  # 多机部署时从节点取消注释该行
-#      - SYNC_FREQUENCY=60  # 需要定期从数据库加载数据时取消注释该行
-#      - FRONTEND_BASE_URL=https://openai.justsong.cn  # 多机部署时从节点取消注释该行
+#     - NODE_TYPE=slave
+#     - SYNC_FREQUENCY=60
+#     - FRONTEND_BASE_URL=https://example.com
     depends_on:
       - redis
       - db
@@ -38,12 +42,12 @@ services:
     restart: always
     container_name: mysql
     volumes:
-      - ./data/mysql:/var/lib/mysql  # 挂载目录，持久化存储
+      - ./data/mysql:/var/lib/mysql
     ports:
       - '3306:3306'
     environment:
-      TZ: Asia/Shanghai   # 设置时区
-      MYSQL_ROOT_PASSWORD: 'OneAPI@justsong' # 设置 root 用户的密码
-      MYSQL_USER: oneapi   # 创建专用用户
-      MYSQL_PASSWORD: '123456'    # 设置专用用户密码
-      MYSQL_DATABASE: one-api   # 自动创建数据库
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: 'OneAPI@justsong'
+      MYSQL_USER: oneapi
+      MYSQL_PASSWORD: '123456'
+      MYSQL_DATABASE: one-api

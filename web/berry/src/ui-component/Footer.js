@@ -1,5 +1,5 @@
 // material-ui
-import { Link, Container, Box } from '@mui/material';
+import { Container, Box } from '@mui/material';
 import React from 'react';
 import { useSelector } from 'react-redux';
 
@@ -14,20 +14,7 @@ const Footer = () => {
         {siteInfo.footer_html ? (
           <div className="custom-footer" dangerouslySetInnerHTML={{ __html: siteInfo.footer_html }}></div>
         ) : (
-          <>
-            <Link href="https://github.com/songquanpeng/one-api" target="_blank">
-              {siteInfo.system_name} {process.env.REACT_APP_VERSION}{' '}
-            </Link>
-            由{' '}
-            <Link href="https://github.com/songquanpeng" target="_blank">
-              JustSong
-            </Link>{' '}
-            构建，主题 berry 来自{' '}
-            <Link href="https://github.com/MartialBE" target="_blank">
-              MartialBE
-            </Link>{' '}，源代码遵循
-            <Link href="https://opensource.org/licenses/mit-license.php"> MIT 协议</Link>
-          </>
+          <>{siteInfo.system_name} {process.env.REACT_APP_VERSION}</>
         )}
       </Box>
     </Container>

@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Container, Segment } from 'semantic-ui-react';
 import { getFooterHTML, getSystemName } from '../helpers';
 
 const Footer = () => {
-  const { t } = useTranslation();
   const systemName = getSystemName();
   const [footer, setFooter] = useState(getFooterHTML());
   let remainCheckTimes = 5;
@@ -37,19 +35,7 @@ const Footer = () => {
             dangerouslySetInnerHTML={{ __html: footer }}
           ></div>
         ) : (
-          <div className='custom-footer'>
-            <a href='https://github.com/songquanpeng/one-api' target='_blank'>
-              {systemName} {process.env.REACT_APP_VERSION}{' '}
-            </a>
-            {t('footer.built_by')}{' '}
-            <a href='https://github.com/songquanpeng' target='_blank'>
-              {t('footer.built_by_name')}
-            </a>{' '}
-            {t('footer.license')}{' '}
-            <a href='https://opensource.org/licenses/mit-license.php'>
-              {t('footer.mit')}
-            </a>
-          </div>
+          <div className='custom-footer'>{systemName} {process.env.REACT_APP_VERSION}</div>
         )}
       </Container>
     </Segment>

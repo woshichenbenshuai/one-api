@@ -19,7 +19,7 @@
 
 ### 主题：default
 
-默认主题，由 [JustSong](https://github.com/songquanpeng) 开发。
+默认主题。
 
 预览：
 |![image](https://github.com/songquanpeng/one-api/assets/39998050/ccfbc668-3a7f-4bc1-87da-7eacfd7bf371)|![image](https://github.com/songquanpeng/one-api/assets/39998050/a63ed547-44b9-45db-b43a-ecea07d60840)|

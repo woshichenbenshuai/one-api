@@ -209,7 +209,6 @@ const OtherSetting = () => {
           <Form.Button onClick={submitAbout}>
             {t('setting.other.content.buttons.save_about')}
           </Form.Button>
-          <Message>{t('setting.other.copyright.notice')}</Message>
           <Form.Group widths='equal'>
             <Form.Input
               label={t('setting.other.content.footer.title')}
