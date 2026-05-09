@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/client"
+	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"io"
 	"net/http"
@@ -23,6 +24,16 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
+	if meta.UseResponsesCompat {
+		logger.Infof(
+			c.Request.Context(),
+			"responses compat upstream request: %s %s (client_path=%s, model=%s)",
+			c.Request.Method,
+			fullRequestURL,
+			c.Request.URL.Path,
+			meta.ActualModelName,
+		)
+	}
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
@@ -34,6 +45,14 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	resp, err := DoRequest(c, req)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
+	}
+	if meta.UseResponsesCompat {
+		logger.Infof(
+			c.Request.Context(),
+			"responses compat upstream response: status=%d (model=%s)",
+			resp.StatusCode,
+			meta.ActualModelName,
+		)
 	}
 	return resp, nil
 }
