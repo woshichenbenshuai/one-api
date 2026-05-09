@@ -148,6 +148,10 @@ const Header = () => {
     i18n.changeLanguage(language);
   };
 
+  if (!userState.user) {
+    return null;
+  }
+
   if (isMobile()) {
     return (
       <>

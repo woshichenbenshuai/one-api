@@ -32,11 +32,17 @@ const PersonalSetting = () => {
     email_verification_code: '',
     email: '',
     self_account_deletion_confirmation: '',
+    authenticator_code: '',
+    disable_authenticator_code: '',
   });
   const [status, setStatus] = useState({});
   const [showWeChatBindModal, setShowWeChatBindModal] = useState(false);
   const [showEmailBindModal, setShowEmailBindModal] = useState(false);
   const [showAccountDeleteModal, setShowAccountDeleteModal] = useState(false);
+  const [showAuthenticatorSetupModal, setShowAuthenticatorSetupModal] =
+    useState(false);
+  const [showAuthenticatorDisableModal, setShowAuthenticatorDisableModal] =
+    useState(false);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
@@ -45,6 +51,12 @@ const PersonalSetting = () => {
   const [countdown, setCountdown] = useState(30);
   const [affLink, setAffLink] = useState('');
   const [systemToken, setSystemToken] = useState('');
+  const [authenticatorStatus, setAuthenticatorStatus] = useState({
+    enabled: false,
+    secret_configured: false,
+  });
+  const [authenticatorSecret, setAuthenticatorSecret] = useState('');
+  const [authenticatorURI, setAuthenticatorURI] = useState('');
 
   useEffect(() => {
     let status = localStorage.getItem('status');
@@ -56,6 +68,7 @@ const PersonalSetting = () => {
         setTurnstileSiteKey(status.turnstile_site_key);
       }
     }
+    loadAuthenticatorStatus().then();
   }, []);
 
   useEffect(() => {
@@ -73,6 +86,16 @@ const PersonalSetting = () => {
 
   const handleInputChange = (e, { name, value }) => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
+  };
+
+  const loadAuthenticatorStatus = async () => {
+    const res = await API.get('/api/user/self/authenticator');
+    const { success, message, data } = res.data;
+    if (success) {
+      setAuthenticatorStatus(data);
+    } else {
+      showError(message);
+    }
   };
 
   const generateAccessToken = async () => {
@@ -129,6 +152,63 @@ const PersonalSetting = () => {
       userDispatch({ type: 'logout' });
       localStorage.removeItem('user');
       navigate('/login');
+    } else {
+      showError(message);
+    }
+  };
+
+  const setupAuthenticator = async () => {
+    const res = await API.post('/api/user/self/authenticator/setup');
+    const { success, message, data } = res.data;
+    if (success) {
+      setAuthenticatorSecret(data.secret);
+      setAuthenticatorURI(data.otpauth_uri);
+      setInputs((current) => ({ ...current, authenticator_code: '' }));
+      setShowAuthenticatorSetupModal(true);
+      setAuthenticatorStatus({
+        enabled: false,
+        secret_configured: true,
+      });
+    } else {
+      showError(message);
+    }
+  };
+
+  const enableAuthenticator = async () => {
+    if (!inputs.authenticator_code) {
+      showError('Please enter the authenticator code.');
+      return;
+    }
+    const res = await API.post('/api/user/self/authenticator/enable', {
+      otp_code: inputs.authenticator_code,
+    });
+    const { success, message } = res.data;
+    if (success) {
+      showSuccess('Authenticator enabled.');
+      setShowAuthenticatorSetupModal(false);
+      setAuthenticatorSecret('');
+      setAuthenticatorURI('');
+      setInputs((current) => ({ ...current, authenticator_code: '' }));
+      await loadAuthenticatorStatus();
+    } else {
+      showError(message);
+    }
+  };
+
+  const disableAuthenticator = async () => {
+    if (!inputs.disable_authenticator_code) {
+      showError('Please enter the authenticator code.');
+      return;
+    }
+    const res = await API.post('/api/user/self/authenticator/disable', {
+      otp_code: inputs.disable_authenticator_code,
+    });
+    const { success, message } = res.data;
+    if (success) {
+      showSuccess('Authenticator disabled.');
+      setShowAuthenticatorDisableModal(false);
+      setInputs((current) => ({ ...current, disable_authenticator_code: '' }));
+      await loadAuthenticatorStatus();
     } else {
       showError(message);
     }
@@ -223,6 +303,91 @@ const PersonalSetting = () => {
           style={{ marginTop: '10px' }}
         />
       )}
+      <Divider />
+      <Header as='h3'>Authenticator</Header>
+      <Message>
+        {authenticatorStatus.enabled
+          ? 'Authenticator login is enabled for this account.'
+          : 'Configure TOTP-based authenticator login here.'}
+      </Message>
+      <Button onClick={setupAuthenticator}>Configure Authenticator</Button>
+      {authenticatorStatus.enabled && (
+        <Button onClick={() => setShowAuthenticatorDisableModal(true)}>
+          Disable Authenticator
+        </Button>
+      )}
+      <Modal
+        onClose={() => setShowAuthenticatorSetupModal(false)}
+        onOpen={() => setShowAuthenticatorSetupModal(true)}
+        open={showAuthenticatorSetupModal}
+        size={'small'}
+      >
+        <Modal.Header>Configure Authenticator</Modal.Header>
+        <Modal.Content>
+          <Modal.Description>
+            <Message>
+              Import the secret below into your authenticator app, then enter
+              the current 6-digit code to enable it.
+            </Message>
+            <Form size='large'>
+              <Form.Input
+                fluid
+                readOnly
+                label='Secret'
+                value={authenticatorSecret}
+                onClick={async () => {
+                  if (authenticatorSecret) {
+                    await copy(authenticatorSecret);
+                    showSuccess('Secret copied to clipboard.');
+                  }
+                }}
+              />
+              <Form.TextArea
+                readOnly
+                label='OTPAuth URI'
+                value={authenticatorURI}
+                style={{ minHeight: '100px' }}
+              />
+              <Form.Input
+                fluid
+                label='Code'
+                placeholder='Enter the current authenticator code'
+                name='authenticator_code'
+                value={inputs.authenticator_code || ''}
+                onChange={handleInputChange}
+              />
+              <Button color='' fluid size='large' onClick={enableAuthenticator}>
+                Enable Authenticator
+              </Button>
+            </Form>
+          </Modal.Description>
+        </Modal.Content>
+      </Modal>
+      <Modal
+        onClose={() => setShowAuthenticatorDisableModal(false)}
+        onOpen={() => setShowAuthenticatorDisableModal(true)}
+        open={showAuthenticatorDisableModal}
+        size={'tiny'}
+      >
+        <Modal.Header>Disable Authenticator</Modal.Header>
+        <Modal.Content>
+          <Modal.Description>
+            <Form size='large'>
+              <Form.Input
+                fluid
+                label='Code'
+                placeholder='Enter the current authenticator code'
+                name='disable_authenticator_code'
+                value={inputs.disable_authenticator_code || ''}
+                onChange={handleInputChange}
+              />
+              <Button color='red' fluid size='large' onClick={disableAuthenticator}>
+                Disable Authenticator
+              </Button>
+            </Form>
+          </Modal.Description>
+        </Modal.Content>
+      </Modal>
       <Divider />
       <Header as='h3'>{t('setting.personal.binding.title')}</Header>
       {status.wechat_login && (
