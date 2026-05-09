@@ -1,13 +1,17 @@
 FROM --platform=$BUILDPLATFORM node:16 AS builder
 
 WORKDIR /web
-COPY ./VERSION .
-COPY ./web .
+COPY ./VERSION ./
+COPY ./web/default/package.json ./default/package.json
+COPY ./web/berry/package.json ./berry/package.json
+COPY ./web/air/package.json ./air/package.json
 
 RUN npm install --prefix /web/default & \
     npm install --prefix /web/berry & \
     npm install --prefix /web/air & \
     wait
+
+COPY ./web ./
 
 RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/default & \
     DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/berry & \
@@ -38,7 +42,7 @@ RUN go build -trimpath -ldflags "-s -w -X 'github.com/songquanpeng/one-api/commo
 
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata wget
 
 COPY --from=builder2 /build/one-api /
 

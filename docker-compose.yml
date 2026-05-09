@@ -5,50 +5,75 @@ services:
       dockerfile: Dockerfile
     image: one-api-local:latest
     container_name: one-api
-    restart: always
+    restart: unless-stopped
     command: --log-dir /app/logs
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     volumes:
       - ./data/oneapi:/data
       - ./logs:/app/logs
     environment:
-      - SQL_DSN=oneapi:123456@tcp(db:3306)/one-api
-      - REDIS_CONN_STRING=redis://redis
-      - SESSION_SECRET=random_string
-      - INITIAL_ROOT_USERNAME=${INITIAL_ROOT_USERNAME}
-      - INITIAL_ROOT_PASSWORD=${INITIAL_ROOT_PASSWORD}
-#     - INITIAL_ROOT_DISPLAY_NAME=Root User
-#     - INITIAL_ROOT_AUTHENTICATOR_SECRET=
-      - TZ=Asia/Shanghai
-#     - NODE_TYPE=slave
-#     - SYNC_FREQUENCY=60
-#     - FRONTEND_BASE_URL=https://example.com
+      - PORT=${PORT:-3000}
+      - TZ=${TZ:-Asia/Shanghai}
+      - SQL_DSN=${SQL_DSN:?SQL_DSN is required}
+      - REDIS_CONN_STRING=${REDIS_CONN_STRING:-redis://redis:6379}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET is required}
+      - INITIAL_ROOT_USERNAME=${INITIAL_ROOT_USERNAME:?INITIAL_ROOT_USERNAME is required}
+      - INITIAL_ROOT_PASSWORD=${INITIAL_ROOT_PASSWORD:?INITIAL_ROOT_PASSWORD is required}
+      - INITIAL_ROOT_DISPLAY_NAME=${INITIAL_ROOT_DISPLAY_NAME:-Root User}
+      - INITIAL_ROOT_AUTHENTICATOR_SECRET=${INITIAL_ROOT_AUTHENTICATOR_SECRET:-}
     depends_on:
-      - redis
-      - db
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
     healthcheck:
-      test: [ "CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' | awk -F: '{print $2}'" ]
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:${PORT:-3000}/api/status | grep -q '\"success\":true'"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: "${REGISTRY:-docker.io}/redis:latest"
     container_name: redis
-    restart: always
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   db:
     image: "${REGISTRY:-docker.io}/mysql:8.2.0"
-    restart: always
     container_name: mysql
+    restart: unless-stopped
     volumes:
       - ./data/mysql:/var/lib/mysql
-    ports:
-      - '3306:3306'
     environment:
-      TZ: Asia/Shanghai
-      MYSQL_ROOT_PASSWORD: 'OneAPI@justsong'
-      MYSQL_USER: oneapi
-      MYSQL_PASSWORD: '123456'
-      MYSQL_DATABASE: one-api
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is required}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is required}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
