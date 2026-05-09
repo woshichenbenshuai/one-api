@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/alibailian"
 	"github.com/songquanpeng/one-api/relay/adaptor/baiduv2"
@@ -111,13 +112,32 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if meta.UseResponsesCompat {
+		logger.Infof(
+			c.Request.Context(),
+			"responses compat handling response: stream=%t status=%d actual_model=%s",
+			meta.IsStream,
+			resp.StatusCode,
+			meta.ActualModelName,
+		)
 		if meta.IsStream {
 			var responseText string
 			err, responseText, usage = ResponsesToChatStreamHandler(c, resp, meta.ActualModelName, meta.PromptTokens)
 			_ = responseText
+			logger.Infof(c.Request.Context(), "responses compat stream handler returned: usage_total=%d err_nil=%t", func() int {
+				if usage == nil {
+					return 0
+				}
+				return usage.TotalTokens
+			}(), err == nil)
 			return
 		}
 		err, usage = ResponsesToChatHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		logger.Infof(c.Request.Context(), "responses compat non-stream handler returned: usage_total=%d err_nil=%t", func() int {
+			if usage == nil {
+				return 0
+			}
+			return usage.TotalTokens
+		}(), err == nil)
 		return
 	}
 	if meta.IsStream {

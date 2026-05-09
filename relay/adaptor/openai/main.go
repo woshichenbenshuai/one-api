@@ -329,6 +329,14 @@ func ResponsesToChatHandler(c *gin.Context, resp *http.Response, promptTokens in
 	if usage == nil || usage.TotalTokens == 0 {
 		usage = ResponseText2Usage(outputText, modelName, promptTokens)
 	}
+	logger.Infof(
+		c.Request.Context(),
+		"responses compat non-stream summary: output_items=%d text_len=%d finish_reason=%s usage_total=%d",
+		len(response.Output),
+		len(outputText),
+		finishReason,
+		usage.TotalTokens,
+	)
 	chatResponse := TextResponse{
 		Id:      response.ID,
 		Object:  "chat.completion",
@@ -373,6 +381,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 		usage          *model.Usage
 		responseText   strings.Builder
 		eventType      string
+		lastEventType  string
 		sawToolCall    bool
 		sentRoleChunk  bool
 		toolCallStates = map[int]*responsesToolCallState{}
@@ -403,12 +412,34 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 		if eventType == "" {
 			eventType = event.EventType
 		}
+		lastEventType = eventType
 		if event.ResponseID != "" {
 			responseID = event.ResponseID
 		}
 		if event.Usage != nil {
 			usage = event.Usage
 		}
+		logger.Infof(
+			c.Request.Context(),
+			"responses compat stream event: type=%s raw_type=%s output_index=%d item_type=%s delta_len=%d text_len=%d usage_total=%d",
+			eventType,
+			event.EventType,
+			event.OutputIndex,
+			func() string {
+				if event.Item == nil {
+					return ""
+				}
+				return event.Item.Type
+			}(),
+			len(event.Delta),
+			len(event.Text()),
+			func() int {
+				if event.Usage == nil {
+					return 0
+				}
+				return event.Usage.TotalTokens
+			}(),
+		)
 		if !sentRoleChunk && shouldEmitCompatRoleChunk(eventType, event) {
 			err = render.ObjectData(c, ChatCompletionsStreamResponse{
 				Id:      responseID,
@@ -426,15 +457,21 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 				_ = resp.Body.Close()
 				return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), "", nil
 			}
+			logger.Infof(c.Request.Context(), "responses compat emitted role chunk")
 			sentRoleChunk = true
 		}
 
 		switch eventType {
-		case "response.output_text.delta", "response.refusal.delta":
-			if event.Delta == "" {
+		case "response.output_text.delta", "response.output_text.done", "response.refusal.delta":
+			text := event.Delta
+			if eventType == "response.output_text.done" && text == "" {
+				text = event.Text()
+			}
+			if text == "" {
 				continue
 			}
-			responseText.WriteString(event.Delta)
+			responseText.WriteString(text)
+			logger.Infof(c.Request.Context(), "responses compat emitted text chunk: len=%d total_text_len=%d", len(text), responseText.Len())
 			err = render.ObjectData(c, ChatCompletionsStreamResponse{
 				Id:      responseID,
 				Object:  "chat.completion.chunk",
@@ -443,7 +480,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 				Choices: []ChatCompletionsStreamResponseChoice{{
 					Index: 0,
 					Delta: model.Message{
-						Content: event.Delta,
+						Content: text,
 					},
 				}},
 			})
@@ -456,6 +493,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 					text := responseItemText(*event.Item)
 					if text != "" && responseText.Len() == 0 {
 						responseText.WriteString(text)
+						logger.Infof(c.Request.Context(), "responses compat emitted fallback item text: len=%d", len(text))
 						err = render.ObjectData(c, ChatCompletionsStreamResponse{
 							Id:      responseID,
 							Object:  "chat.completion.chunk",
@@ -475,6 +513,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 			sawToolCall = true
 			state := getOrCreateToolCallState(toolCallStates, event)
 			if eventType == "response.output_item.added" {
+				logger.Infof(c.Request.Context(), "responses compat emitted tool-call header: id=%s name=%s", state.ID, state.Name)
 				err = render.ObjectData(c, ChatCompletionsStreamResponse{
 					Id:      responseID,
 					Object:  "chat.completion.chunk",
@@ -500,6 +539,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 				continue
 			}
 			state.Arguments.WriteString(event.Item.Arguments)
+			logger.Infof(c.Request.Context(), "responses compat emitted tool-call body from item.done: id=%s args_len=%d", state.ID, len(event.Item.Arguments))
 			err = render.ObjectData(c, ChatCompletionsStreamResponse{
 				Id:      responseID,
 				Object:  "chat.completion.chunk",
@@ -538,6 +578,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 			sawToolCall = true
 			state := getOrCreateToolCallState(toolCallStates, event)
 			state.Arguments.WriteString(argumentDelta)
+			logger.Infof(c.Request.Context(), "responses compat emitted tool-call delta: id=%s delta_len=%d total_args_len=%d", state.ID, len(argumentDelta), state.Arguments.Len())
 			err = render.ObjectData(c, ChatCompletionsStreamResponse{
 				Id:      responseID,
 				Object:  "chat.completion.chunk",
@@ -569,6 +610,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 					text := event.RawResponse.OutputText()
 					if text != "" {
 						responseText.WriteString(text)
+						logger.Infof(c.Request.Context(), "responses compat emitted completed-event fallback text: len=%d", len(text))
 						err = render.ObjectData(c, ChatCompletionsStreamResponse{
 							Id:      responseID,
 							Object:  "chat.completion.chunk",
@@ -601,6 +643,20 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 	if err := scanner.Err(); err != nil {
 		logger.SysError("error reading responses stream: " + err.Error())
 	}
+	logger.Infof(
+		c.Request.Context(),
+		"responses compat stream summary: text_len=%d, saw_tool_call=%t, usage_total=%d, last_event=%s, response_id=%s",
+		responseText.Len(),
+		sawToolCall,
+		func() int {
+			if usage == nil {
+				return 0
+			}
+			return usage.TotalTokens
+		}(),
+		lastEventType,
+		responseID,
+	)
 
 	finishReason := "stop"
 	if sawToolCall {

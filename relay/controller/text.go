@@ -154,6 +154,16 @@ func getConvertedRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model
 		logger.Debugf(c.Request.Context(), "converted request json_marshal_failed: %s\n", err.Error())
 		return nil, err
 	}
+	if meta.UseResponsesCompat {
+		logger.Infof(
+			c.Request.Context(),
+			"responses compat request body prepared: bytes=%d stream=%t prompt_tokens=%d",
+			len(jsonData),
+			textRequest.Stream,
+			meta.PromptTokens,
+		)
+		logger.Infof(c.Request.Context(), "responses compat request preview: %s", truncateForLog(string(jsonData), 1200))
+	}
 	logger.Debugf(c.Request.Context(), "converted request: \n%s", string(jsonData))
 	return bytes.NewBuffer(jsonData), nil
 }
@@ -166,5 +176,19 @@ func configureOpenAICompatMode(meta *meta.Meta, textRequest *model.GeneralOpenAI
 	if openai.ShouldUseResponsesCompat(meta.Mode, textRequest.Model) {
 		meta.UseResponsesCompat = true
 		meta.RequestURLPath = "/v1/responses"
+		logger.SysLogf(
+			"responses compat enabled: origin_model=%s actual_model=%s client_mode=%d rewritten_path=%s",
+			meta.OriginModelName,
+			textRequest.Model,
+			meta.Mode,
+			meta.RequestURLPath,
+		)
 	}
+}
+
+func truncateForLog(input string, limit int) string {
+	if len(input) <= limit {
+		return input
+	}
+	return input[:limit] + "...(truncated)"
 }
