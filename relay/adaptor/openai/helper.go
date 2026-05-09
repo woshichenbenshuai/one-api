@@ -6,6 +6,7 @@ import (
 
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/model"
+	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 func ResponseText2Usage(responseText string, modelName string, promptTokens int) *model.Usage {
@@ -31,4 +32,12 @@ func GetFullRequestURL(baseURL string, requestURL string, channelType int) strin
 		}
 	}
 	return fullRequestURL
+}
+
+func ShouldUseResponsesCompat(relayMode int, modelName string) bool {
+	if relayMode != relaymode.ChatCompletions {
+		return false
+	}
+	modelName = strings.ToLower(strings.TrimSpace(modelName))
+	return strings.HasPrefix(modelName, "gpt-5") || strings.Contains(modelName, "codex")
 }

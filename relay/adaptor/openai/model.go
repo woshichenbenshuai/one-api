@@ -107,11 +107,19 @@ type ResponsesOutputContent struct {
 }
 
 type ResponsesOutputItem struct {
-	Type    string                   `json:"type,omitempty"`
-	Content []ResponsesOutputContent `json:"content,omitempty"`
+	ID        string                   `json:"id,omitempty"`
+	Type      string                   `json:"type,omitempty"`
+	Role      string                   `json:"role,omitempty"`
+	Status    string                   `json:"status,omitempty"`
+	CallID    string                   `json:"call_id,omitempty"`
+	Name      string                   `json:"name,omitempty"`
+	Arguments string                   `json:"arguments,omitempty"`
+	Content   []ResponsesOutputContent `json:"content,omitempty"`
 }
 
 type ResponsesResponse struct {
+	ID     string                `json:"id,omitempty"`
+	Object string                `json:"object,omitempty"`
 	Output []ResponsesOutputItem `json:"output,omitempty"`
 	Usage  *ResponsesUsage       `json:"usage,omitempty"`
 	Error  model.Error           `json:"error"`

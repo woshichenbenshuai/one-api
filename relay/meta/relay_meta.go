@@ -34,6 +34,7 @@ type Meta struct {
 	RequestURLPath     string
 	PromptTokens       int // only for DoResponse
 	ForcedSystemPrompt string
+	UseResponsesCompat bool
 	StartTime          time.Time
 }
 

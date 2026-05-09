@@ -85,6 +85,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
+	if ShouldUseResponsesCompat(relayMode, request.Model) {
+		return ConvertChatToResponsesRequest(request), nil
+	}
 	if request.Stream && relayMode != relaymode.Responses {
 		// always return usage in stream mode
 		if request.StreamOptions == nil {
@@ -107,6 +110,12 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+	if meta.UseResponsesCompat {
+		if meta.IsStream {
+			return ResponsesToChatStreamHandler(c, resp, meta.ActualModelName, meta.PromptTokens)
+		}
+		return ResponsesToChatHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
+	}
 	if meta.IsStream {
 		var responseText string
 		if meta.Mode == relaymode.Responses {
