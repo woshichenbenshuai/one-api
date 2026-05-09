@@ -12,7 +12,7 @@ import (
 func ConvertChatToResponsesRequest(request *model.GeneralOpenAIRequest) map[string]any {
 	payload := map[string]any{
 		"model":  request.Model,
-		"stream": request.Stream,
+		"stream": false,
 	}
 
 	if request.Store != nil {
