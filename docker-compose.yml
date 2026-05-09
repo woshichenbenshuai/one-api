@@ -15,9 +15,8 @@ services:
     environment:
       - PORT=${PORT:-3000}
       - TZ=${TZ:-Asia/Shanghai}
-      - SQL_DSN=${SQL_DSN:?SQL_DSN is required}
-      - REDIS_CONN_STRING=${REDIS_CONN_STRING:-redis://redis:6379}
-      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET is required}
+      - SQL_DSN=oneapi:admin123@tcp(db:3306)/one-api
+      - REDIS_CONN_STRING=redis://redis:6379
       - INITIAL_ROOT_USERNAME=${INITIAL_ROOT_USERNAME:?INITIAL_ROOT_USERNAME is required}
       - INITIAL_ROOT_PASSWORD=${INITIAL_ROOT_PASSWORD:?INITIAL_ROOT_PASSWORD is required}
       - INITIAL_ROOT_DISPLAY_NAME=${INITIAL_ROOT_DISPLAY_NAME:-Root User}
@@ -62,12 +61,12 @@ services:
       - ./data/mysql:/var/lib/mysql
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
-      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is required}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is required}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_USER: oneapi
+      MYSQL_PASSWORD: admin123
+      MYSQL_DATABASE: one-api
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uoneapi -padmin123 --silent"]
       interval: 10s
       timeout: 5s
       retries: 20

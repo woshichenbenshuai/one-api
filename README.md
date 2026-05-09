@@ -205,10 +205,6 @@ docker compose ps
 最少需要确认这些变量已经替换为真实值：
 
 ```env
-SESSION_SECRET=your-random-secret
-MYSQL_ROOT_PASSWORD=your-root-password
-MYSQL_PASSWORD=your-app-password
-SQL_DSN=oneapi:your-app-password@tcp(db:3306)/one-api
 INITIAL_ROOT_USERNAME=your-admin-name
 INITIAL_ROOT_PASSWORD=your-admin-password
 ```
