@@ -93,7 +93,7 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 func getRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model.GeneralOpenAIRequest, adaptor adaptor.Adaptor) (io.Reader, error) {
 	if meta.APIType == apitype.OpenAI && meta.ChannelType != channeltype.Baichuan {
 		if meta.UseResponsesCompat {
-			return getConvertedRequestBody(c, meta, textRequest, adaptor)
+			return getResponsesCompatRequestBody(c, meta, textRequest)
 		}
 		if !config.EnforceIncludeUsage &&
 			meta.OriginModelName == meta.ActualModelName &&
@@ -106,6 +106,24 @@ func getRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model.GeneralO
 
 	// get request body
 	return getConvertedRequestBody(c, meta, textRequest, adaptor)
+}
+
+func getResponsesCompatRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model.GeneralOpenAIRequest) (io.Reader, error) {
+	convertedRequest := openai.ConvertChatToResponsesRequest(textRequest)
+	jsonData, err := json.Marshal(convertedRequest)
+	if err != nil {
+		logger.Debugf(c.Request.Context(), "responses compat request json_marshal_failed: %s\n", err.Error())
+		return nil, err
+	}
+	logger.Infof(
+		c.Request.Context(),
+		"responses compat request body prepared: bytes=%d stream=%t prompt_tokens=%d",
+		len(jsonData),
+		textRequest.Stream,
+		meta.PromptTokens,
+	)
+	logger.Infof(c.Request.Context(), "responses compat request preview: %s", truncateForLog(string(jsonData), 1200))
+	return bytes.NewBuffer(jsonData), nil
 }
 
 func getPatchedOpenAIRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model.GeneralOpenAIRequest) (io.Reader, error) {
@@ -173,11 +191,11 @@ func configureOpenAICompatMode(meta *meta.Meta, textRequest *model.GeneralOpenAI
 	if meta.APIType != apitype.OpenAI || meta.ChannelType == channeltype.Azure {
 		return
 	}
-	if openai.ShouldUseResponsesCompat(meta.Mode, textRequest.Model) {
+	if meta.Config.ResponsesCompat {
 		meta.UseResponsesCompat = true
 		meta.RequestURLPath = "/v1/responses"
 		logger.SysLogf(
-			"responses compat enabled: origin_model=%s actual_model=%s client_mode=%d rewritten_path=%s",
+			"responses compat enabled: channel_config=true origin_model=%s actual_model=%s client_mode=%d rewritten_path=%s",
 			meta.OriginModelName,
 			textRequest.Model,
 			meta.Mode,

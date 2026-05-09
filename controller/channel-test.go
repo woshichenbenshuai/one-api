@@ -34,14 +34,14 @@ import (
 	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
-func buildTestRequest(model string) *relaymodel.GeneralOpenAIRequest {
+func buildTestRequest(model string, useResponsesCompat bool) *relaymodel.GeneralOpenAIRequest {
 	if model == "" {
 		model = "gpt-3.5-turbo"
 	}
 	testRequest := &relaymodel.GeneralOpenAIRequest{
 		Model: model,
 	}
-	if shouldUseResponsesTest(model) {
+	if useResponsesCompat {
 		testRequest.Input = config.TestPrompt
 		return testRequest
 	}
@@ -51,10 +51,6 @@ func buildTestRequest(model string) *relaymodel.GeneralOpenAIRequest {
 	}
 	testRequest.Messages = append(testRequest.Messages, testMessage)
 	return testRequest
-}
-
-func shouldUseResponsesTest(model string) bool {
-	return strings.HasPrefix(model, "gpt-5") || strings.Contains(model, "codex")
 }
 
 func parseTestResponse(resp string) (*openai.TextResponse, string, error) {
@@ -216,7 +212,8 @@ func TestChannel(c *gin.Context) {
 		return
 	}
 	modelName := c.Query("model")
-	testRequest := buildTestRequest(modelName)
+	cfg, _ := channel.LoadConfig()
+	testRequest := buildTestRequest(modelName, cfg.ResponsesCompat)
 	tik := time.Now()
 	responseMessage, err, _ := testChannel(ctx, channel, testRequest)
 	tok := time.Now()
@@ -270,7 +267,8 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 		for _, channel := range channels {
 			isChannelEnabled := channel.Status == model.ChannelStatusEnabled
 			tik := time.Now()
-			testRequest := buildTestRequest("")
+			cfg, _ := channel.LoadConfig()
+			testRequest := buildTestRequest("", cfg.ResponsesCompat)
 			_, err, openaiErr := testChannel(ctx, channel, testRequest)
 			tok := time.Now()
 			milliseconds := tok.Sub(tik).Milliseconds()

@@ -108,7 +108,7 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
       setFieldValue('models', initialModel(localModels));
     }
 
-    setFieldValue('config', {});
+    setFieldValue('config', { responses_compat: false });
   };
 
   const fetchGroups = async () => {
@@ -238,7 +238,9 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
         data.model_mapping = JSON.stringify(JSON.parse(data.model_mapping), null, 2);
       }
       if (data.config !== '') {
-        data.config = JSON.parse(data.config);
+        data.config = { responses_compat: false, ...JSON.parse(data.config) };
+      } else {
+        data.config = { responses_compat: false };
       }
 
       data.base_url = data.base_url ?? '';
@@ -616,6 +618,21 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
                 ) : (
                   <FormHelperText id="helper-tex-channel-system_prompt-label"> {inputPrompt.system_prompt} </FormHelperText>
                 )}
+              </FormControl>
+              <FormControl fullWidth sx={{ ...theme.typography.otherInput }}>
+                <Container sx={{ paddingLeft: 0 }}>
+                  <Checkbox
+                    checked={!!values.config?.responses_compat}
+                    onChange={(e) => {
+                      setFieldValue('config', {
+                        ...(values.config || {}),
+                        responses_compat: e.target.checked
+                      });
+                    }}
+                  />
+                  对此渠道启用 Responses 兼容转发
+                </Container>
+                <FormHelperText>仅对此渠道生效，不再按模型名自动判断</FormHelperText>
               </FormControl>
               <DialogActions>
                 <Button onClick={onCancel}>取消</Button>

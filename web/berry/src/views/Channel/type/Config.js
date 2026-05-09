@@ -8,7 +8,9 @@ const defaultConfig = {
     model_mapping: '',
     models: [],
     groups: ['default'],
-    config: {}
+    config: {
+      responses_compat: false
+    }
   },
   inputLabel: {
     name: '渠道名称',

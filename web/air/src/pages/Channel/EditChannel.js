@@ -44,6 +44,8 @@ const EditChannel = (props) => {
         other: '',
         model_mapping: '',
         system_prompt: '',
+        responses_compat: false,
+        config: {},
         models: [],
         auto_ban: 1,
         groups: ['default']
@@ -142,6 +144,19 @@ const EditChannel = (props) => {
             }
             if (data.model_mapping !== '') {
                 data.model_mapping = JSON.stringify(JSON.parse(data.model_mapping), null, 2);
+            }
+            if (data.config !== '') {
+                try {
+                    const channelConfig = JSON.parse(data.config);
+                    data.config = channelConfig;
+                    data.responses_compat = !!channelConfig.responses_compat;
+                } catch (error) {
+                    data.config = {};
+                    data.responses_compat = false;
+                }
+            } else {
+                data.config = {};
+                data.responses_compat = false;
             }
             setInputs(data);
             if (data.auto_ban === 0) {
@@ -245,6 +260,10 @@ const EditChannel = (props) => {
         localInputs.auto_ban = autoBan ? 1 : 0;
         localInputs.models = localInputs.models.join(',');
         localInputs.group = localInputs.groups.join(',');
+        localInputs.config = JSON.stringify({
+            ...(localInputs.config || {}),
+            responses_compat: !!localInputs.responses_compat
+        });
         if (isEdit) {
             res = await API.put(`/api/channel/`, {...localInputs, id: parseInt(channelId)});
         } else {
@@ -577,6 +596,18 @@ const EditChannel = (props) => {
                             />
                             <Typography.Text
                               strong>是否自动禁用（仅当自动禁用开启时有效），关闭后不会自动禁用该渠道：</Typography.Text>
+                        </Space>
+                    </div>
+                    <div style={{ marginTop: 10, display: 'flex' }}>
+                        <Space>
+                            <Checkbox
+                              name='responses_compat'
+                              checked={!!inputs.responses_compat}
+                              onChange={() => {
+                                  handleInputChange('responses_compat', !inputs.responses_compat);
+                              }}
+                            />
+                            <Typography.Text strong>对此渠道启用 Responses 兼容转发</Typography.Text>
                         </Space>
                     </div>
 

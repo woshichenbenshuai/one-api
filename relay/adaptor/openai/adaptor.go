@@ -89,9 +89,6 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	if ShouldUseResponsesCompat(relayMode, request.Model) {
-		return ConvertChatToResponsesRequest(request), nil
-	}
 	if request.Stream && relayMode != relaymode.Responses {
 		// always return usage in stream mode
 		if request.StreamOptions == nil {
