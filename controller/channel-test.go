@@ -41,12 +41,20 @@ func buildTestRequest(model string) *relaymodel.GeneralOpenAIRequest {
 	testRequest := &relaymodel.GeneralOpenAIRequest{
 		Model: model,
 	}
+	if shouldUseResponsesTest(model) {
+		testRequest.Input = config.TestPrompt
+		return testRequest
+	}
 	testMessage := relaymodel.Message{
 		Role:    "user",
 		Content: config.TestPrompt,
 	}
 	testRequest.Messages = append(testRequest.Messages, testMessage)
 	return testRequest
+}
+
+func shouldUseResponsesTest(model string) bool {
+	return strings.HasPrefix(model, "gpt-5") || strings.Contains(model, "codex")
 }
 
 func parseTestResponse(resp string) (*openai.TextResponse, string, error) {
@@ -65,13 +73,32 @@ func parseTestResponse(resp string) (*openai.TextResponse, string, error) {
 	return &response, stringContent, nil
 }
 
+func parseTestResponsesResponse(resp string) (*openai.ResponsesResponse, string, error) {
+	var response openai.ResponsesResponse
+	err := json.Unmarshal([]byte(resp), &response)
+	if err != nil {
+		return nil, "", err
+	}
+	outputText := response.OutputText()
+	if outputText == "" {
+		return nil, "", errors.New("response has no output text")
+	}
+	return &response, outputText, nil
+}
+
 func testChannel(ctx context.Context, channel *model.Channel, request *relaymodel.GeneralOpenAIRequest) (responseMessage string, err error, openaiErr *relaymodel.Error) {
 	startTime := time.Now()
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	requestPath := "/v1/chat/completions"
+	relayMode := relaymode.ChatCompletions
+	if request.Input != nil && len(request.Messages) == 0 {
+		requestPath = "/v1/responses"
+		relayMode = relaymode.Responses
+	}
 	c.Request = &http.Request{
 		Method: "POST",
-		URL:    &url.URL{Path: "/v1/chat/completions"},
+		URL:    &url.URL{Path: requestPath},
 		Body:   nil,
 		Header: make(http.Header),
 	}
@@ -102,7 +129,7 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 	}
 	meta.OriginModelName, meta.ActualModelName = request.Model, modelName
 	request.Model = modelName
-	convertedRequest, err := adaptor.ConvertRequest(c, relaymode.ChatCompletions, request)
+	convertedRequest, err := adaptor.ConvertRequest(c, relayMode, request)
 	if err != nil {
 		return "", err, nil
 	}
@@ -151,7 +178,11 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 		return "", errors.New("usage is nil"), nil
 	}
 	rawResponse := w.Body.String()
-	_, responseMessage, err = parseTestResponse(rawResponse)
+	if relayMode == relaymode.Responses {
+		_, responseMessage, err = parseTestResponsesResponse(rawResponse)
+	} else {
+		_, responseMessage, err = parseTestResponse(rawResponse)
+	}
 	if err != nil {
 		logger.SysError(fmt.Sprintf("failed to parse error: %s, \nresponse: %s", err.Error(), rawResponse))
 		return "", err, nil

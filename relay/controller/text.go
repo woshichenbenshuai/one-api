@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay"
@@ -20,6 +21,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
+	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
@@ -88,13 +90,14 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 }
 
 func getRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model.GeneralOpenAIRequest, adaptor adaptor.Adaptor) (io.Reader, error) {
-	if !config.EnforceIncludeUsage &&
-		meta.APIType == apitype.OpenAI &&
-		meta.OriginModelName == meta.ActualModelName &&
-		meta.ChannelType != channeltype.Baichuan &&
-		meta.ForcedSystemPrompt == "" {
-		// no need to convert request for openai
-		return c.Request.Body, nil
+	if meta.APIType == apitype.OpenAI && meta.ChannelType != channeltype.Baichuan {
+		if !config.EnforceIncludeUsage &&
+			meta.OriginModelName == meta.ActualModelName &&
+			meta.ForcedSystemPrompt == "" {
+			// no need to convert request for openai
+			return c.Request.Body, nil
+		}
+		return getPatchedOpenAIRequestBody(c, meta, textRequest)
 	}
 
 	// get request body
@@ -112,4 +115,39 @@ func getRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model.GeneralO
 	logger.Debugf(c.Request.Context(), "converted request: \n%s", string(jsonData))
 	requestBody = bytes.NewBuffer(jsonData)
 	return requestBody, nil
+}
+
+func getPatchedOpenAIRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model.GeneralOpenAIRequest) (io.Reader, error) {
+	requestBody, err := common.GetRequestBody(c)
+	if err != nil {
+		return nil, err
+	}
+	payload := make(map[string]any)
+	if err = json.Unmarshal(requestBody, &payload); err != nil {
+		return nil, err
+	}
+	if meta.OriginModelName != meta.ActualModelName {
+		payload["model"] = textRequest.Model
+	}
+	if meta.ForcedSystemPrompt != "" {
+		if len(textRequest.Messages) > 0 {
+			payload["messages"] = textRequest.Messages
+		} else if textRequest.Instructions != "" {
+			payload["instructions"] = textRequest.Instructions
+		}
+	}
+	if config.EnforceIncludeUsage && textRequest.Stream && meta.Mode != relaymode.Responses {
+		streamOptions, ok := payload["stream_options"].(map[string]any)
+		if !ok || streamOptions == nil {
+			streamOptions = make(map[string]any)
+		}
+		streamOptions["include_usage"] = true
+		payload["stream_options"] = streamOptions
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	logger.Debugf(c.Request.Context(), "patched openai request: \n%s", string(jsonData))
+	return bytes.NewBuffer(jsonData), nil
 }

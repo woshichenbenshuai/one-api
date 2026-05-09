@@ -82,6 +82,56 @@ type SlimTextResponse struct {
 	Error       model.Error `json:"error"`
 }
 
+type ResponsesUsage struct {
+	InputTokens            int                             `json:"input_tokens"`
+	OutputTokens           int                             `json:"output_tokens"`
+	TotalTokens            int                             `json:"total_tokens"`
+	OutputTokensDetails    *model.CompletionTokensDetails  `json:"output_tokens_details,omitempty"`
+}
+
+func (u *ResponsesUsage) ToUsage() *model.Usage {
+	if u == nil {
+		return nil
+	}
+	return &model.Usage{
+		PromptTokens:            u.InputTokens,
+		CompletionTokens:        u.OutputTokens,
+		TotalTokens:             u.TotalTokens,
+		CompletionTokensDetails: u.OutputTokensDetails,
+	}
+}
+
+type ResponsesOutputContent struct {
+	Type string `json:"type,omitempty"`
+	Text string `json:"text,omitempty"`
+}
+
+type ResponsesOutputItem struct {
+	Type    string                   `json:"type,omitempty"`
+	Content []ResponsesOutputContent `json:"content,omitempty"`
+}
+
+type ResponsesResponse struct {
+	Output []ResponsesOutputItem `json:"output,omitempty"`
+	Usage  *ResponsesUsage       `json:"usage,omitempty"`
+	Error  model.Error           `json:"error"`
+}
+
+func (r *ResponsesResponse) OutputText() string {
+	if r == nil {
+		return ""
+	}
+	var text string
+	for _, item := range r.Output {
+		for _, content := range item.Content {
+			if content.Type == "output_text" {
+				text += content.Text
+			}
+		}
+	}
+	return text
+}
+
 type TextResponseChoice struct {
 	Index         int `json:"index"`
 	model.Message `json:"message"`

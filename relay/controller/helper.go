@@ -49,6 +49,8 @@ func getPromptTokens(textRequest *relaymodel.GeneralOpenAIRequest, relayMode int
 	switch relayMode {
 	case relaymode.ChatCompletions:
 		return openai.CountTokenMessages(textRequest.Messages, textRequest.Model)
+	case relaymode.Responses:
+		return openai.CountTokenInput(textRequest.Input, textRequest.Model)
 	case relaymode.Completions:
 		return openai.CountTokenInput(textRequest.Prompt, textRequest.Model)
 	case relaymode.Moderations:
@@ -181,18 +183,25 @@ func setSystemPrompt(ctx context.Context, request *relaymodel.GeneralOpenAIReque
 	if prompt == "" {
 		return false
 	}
-	if len(request.Messages) == 0 {
-		return false
+	if len(request.Messages) > 0 {
+		if request.Messages[0].Role == role.System {
+			request.Messages[0].Content = prompt
+			logger.Infof(ctx, "rewrite system prompt")
+			return true
+		}
+		request.Messages = append([]relaymodel.Message{{
+			Role:    role.System,
+			Content: prompt,
+		}}, request.Messages...)
+		logger.Infof(ctx, "add system prompt")
+		return true
 	}
-	if request.Messages[0].Role == role.System {
-		request.Messages[0].Content = prompt
+	if request.Instructions != "" {
+		request.Instructions = prompt
 		logger.Infof(ctx, "rewrite system prompt")
 		return true
 	}
-	request.Messages = append([]relaymodel.Message{{
-		Role:    role.System,
-		Content: prompt,
-	}}, request.Messages...)
+	request.Instructions = prompt
 	logger.Infof(ctx, "add system prompt")
 	return true
 }

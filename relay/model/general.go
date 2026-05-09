@@ -24,6 +24,7 @@ type StreamOptions struct {
 type GeneralOpenAIRequest struct {
 	// https://platform.openai.com/docs/api-reference/chat/create
 	Messages            []Message       `json:"messages,omitempty"`
+	Instructions        string          `json:"instructions,omitempty"`
 	Model               string          `json:"model,omitempty"`
 	Store               *bool           `json:"store,omitempty"`
 	ReasoningEffort     *string         `json:"reasoning_effort,omitempty"`

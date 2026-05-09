@@ -23,9 +23,13 @@ func ValidateTextRequest(textRequest *model.GeneralOpenAIRequest, relayMode int)
 		if textRequest.Messages == nil || len(textRequest.Messages) == 0 {
 			return errors.New("field messages is required")
 		}
+	case relaymode.Responses:
+		if !hasTextInput(textRequest.Input) {
+			return errors.New("field input is required")
+		}
 	case relaymode.Embeddings:
 	case relaymode.Moderations:
-		if textRequest.Input == "" {
+		if !hasTextInput(textRequest.Input) {
 			return errors.New("field input is required")
 		}
 	case relaymode.Edits:
@@ -34,4 +38,19 @@ func ValidateTextRequest(textRequest *model.GeneralOpenAIRequest, relayMode int)
 		}
 	}
 	return nil
+}
+
+func hasTextInput(input any) bool {
+	switch v := input.(type) {
+	case nil:
+		return false
+	case string:
+		return v != ""
+	case []string:
+		return len(v) > 0
+	case []any:
+		return len(v) > 0
+	default:
+		return true
+	}
 }

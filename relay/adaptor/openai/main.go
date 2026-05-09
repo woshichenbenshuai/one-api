@@ -20,6 +20,7 @@ import (
 
 const (
 	dataPrefix       = "data: "
+	eventPrefix      = "event: "
 	done             = "[DONE]"
 	dataPrefixLength = len(dataPrefix)
 )
@@ -28,6 +29,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 	responseText := ""
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	var usage *model.Usage
 
 	common.SetEventStreamHeaders(c)
@@ -96,6 +98,62 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 	return nil, responseText, usage
 }
 
+func ResponsesStreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, string, *model.Usage) {
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Split(bufio.ScanLines)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for k, v := range resp.Header {
+		c.Writer.Header().Set(k, v[0])
+	}
+	common.SetEventStreamHeaders(c)
+
+	var (
+		responseText strings.Builder
+		usage        *model.Usage
+		eventType    string
+	)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, eventPrefix) {
+			eventType = strings.TrimSpace(strings.TrimPrefix(line, eventPrefix))
+		} else if strings.HasPrefix(line, dataPrefix) {
+			payload := strings.TrimPrefix(line, dataPrefix)
+			if payload != done {
+				eventUsage, eventText := parseResponsesStreamEvent(payload)
+				if eventUsage != nil {
+					usage = eventUsage
+				}
+				if eventText != "" {
+					if strings.HasSuffix(eventType, ".delta") || responseText.Len() == 0 {
+						responseText.WriteString(eventText)
+					}
+				}
+			}
+		} else if line == "" {
+			eventType = ""
+		}
+		_, err := c.Writer.Write([]byte(line + "\n"))
+		if err != nil {
+			_ = resp.Body.Close()
+			return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), "", nil
+		}
+		c.Writer.Flush()
+	}
+
+	if err := scanner.Err(); err != nil {
+		logger.SysError("error reading responses stream: " + err.Error())
+	}
+
+	err := resp.Body.Close()
+	if err != nil {
+		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+
+	return nil, responseText.String(), usage
+}
+
 func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
 	var textResponse SlimTextResponse
 	responseBody, err := io.ReadAll(resp.Body)
@@ -148,4 +206,95 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		}
 	}
 	return nil, &textResponse.Usage
+}
+
+func ResponsesHandler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+	var response ResponsesResponse
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
+	}
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
+	}
+	if response.Error.Type != "" {
+		return &model.ErrorWithStatusCode{
+			Error:      response.Error,
+			StatusCode: resp.StatusCode,
+		}, nil
+	}
+
+	resp.Body = io.NopCloser(bytes.NewBuffer(responseBody))
+	for k, v := range resp.Header {
+		c.Writer.Header().Set(k, v[0])
+	}
+	c.Writer.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(c.Writer, resp.Body)
+	if err != nil {
+		return ErrorWrapper(err, "copy_response_body_failed", http.StatusInternalServerError), nil
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
+	}
+
+	usage := response.Usage.ToUsage()
+	if usage == nil || usage.TotalTokens == 0 {
+		responseText := response.OutputText()
+		usage = ResponseText2Usage(responseText, modelName, promptTokens)
+	}
+	return nil, usage
+}
+
+func parseResponsesStreamEvent(payload string) (*model.Usage, string) {
+	var event struct {
+		Delta    string             `json:"delta,omitempty"`
+		Text     string             `json:"text,omitempty"`
+		Output   []ResponsesOutputItem `json:"output,omitempty"`
+		Response *ResponsesResponse `json:"response,omitempty"`
+		Usage    *ResponsesUsage    `json:"usage,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(payload), &event); err != nil {
+		logger.SysError("error unmarshalling responses stream event: " + err.Error())
+		return nil, ""
+	}
+	if event.Response != nil {
+		if usage := event.Response.Usage.ToUsage(); usage != nil {
+			return usage, event.Response.OutputText()
+		}
+		return nil, event.Response.OutputText()
+	}
+	if event.Usage != nil {
+		if event.Delta != "" {
+			return event.Usage.ToUsage(), event.Delta
+		}
+		if event.Text != "" {
+			return event.Usage.ToUsage(), event.Text
+		}
+		return event.Usage.ToUsage(), outputItemsText(event.Output)
+	}
+	if event.Delta != "" {
+		return nil, event.Delta
+	}
+	if event.Text != "" {
+		return nil, event.Text
+	}
+	return nil, outputItemsText(event.Output)
+}
+
+func outputItemsText(output []ResponsesOutputItem) string {
+	var text strings.Builder
+	for _, item := range output {
+		for _, content := range item.Content {
+			if content.Type == "output_text" {
+				text.WriteString(content.Text)
+			}
+		}
+	}
+	return text.String()
 }

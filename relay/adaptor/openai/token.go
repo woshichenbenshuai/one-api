@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -221,6 +222,24 @@ func CountTokenInput(input any, model string) int {
 			text += s
 		}
 		return CountTokenText(text, model)
+	case []any:
+		text := ""
+		for _, item := range v {
+			switch value := item.(type) {
+			case string:
+				text += value
+			default:
+				jsonData, err := json.Marshal(value)
+				if err == nil {
+					text += string(jsonData)
+				}
+			}
+		}
+		return CountTokenText(text, model)
+	}
+	jsonData, err := json.Marshal(input)
+	if err == nil {
+		return CountTokenText(string(jsonData), model)
 	}
 	return 0
 }

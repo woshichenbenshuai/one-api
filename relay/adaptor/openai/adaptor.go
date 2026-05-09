@@ -85,7 +85,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	if request.Stream {
+	if request.Stream && relayMode != relaymode.Responses {
 		// always return usage in stream mode
 		if request.StreamOptions == nil {
 			request.StreamOptions = &model.StreamOptions{}
@@ -109,7 +109,11 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if meta.IsStream {
 		var responseText string
-		err, responseText, usage = StreamHandler(c, resp, meta.Mode)
+		if meta.Mode == relaymode.Responses {
+			err, responseText, usage = ResponsesStreamHandler(c, resp)
+		} else {
+			err, responseText, usage = StreamHandler(c, resp, meta.Mode)
+		}
 		if usage == nil || usage.TotalTokens == 0 {
 			usage = ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
 		}
@@ -121,6 +125,8 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		switch meta.Mode {
 		case relaymode.ImagesGenerations:
 			err, _ = ImageHandler(c, resp)
+		case relaymode.Responses:
+			err, usage = ResponsesHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
 		default:
 			err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
 		}
