@@ -51,6 +51,7 @@ type ChannelConfig struct {
 	VertexAIProjectID string `json:"vertex_ai_project_id,omitempty"`
 	VertexAIADC       string `json:"vertex_ai_adc,omitempty"`
 	ResponsesCompat   bool   `json:"responses_compat,omitempty"`
+	RequestTimeout    int    `json:"request_timeout,omitempty"`
 }
 
 func GetAllChannels(startIdx int, num int, scope string) ([]*Channel, error) {

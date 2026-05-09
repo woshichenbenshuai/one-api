@@ -2,9 +2,12 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -71,6 +74,13 @@ func RelayTextHelper(c *gin.Context) *model.ErrorWithStatusCode {
 	resp, err := adaptor.DoRequest(c, meta, requestBody)
 	if err != nil {
 		logger.Errorf(ctx, "DoRequest failed: %s", err.Error())
+		if isUpstreamTimeoutError(err) {
+			return openai.ErrorWrapper(
+				fmt.Errorf("upstream request timeout after %s", getUpstreamTimeoutLabel(meta)),
+				"upstream_request_timeout",
+				http.StatusGatewayTimeout,
+			)
+		}
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 	if isErrorHappened(meta, resp) {
@@ -209,4 +219,22 @@ func truncateForLog(input string, limit int) string {
 		return input
 	}
 	return input[:limit] + "...(truncated)"
+}
+
+func isUpstreamTimeoutError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+func getUpstreamTimeoutLabel(meta *meta.Meta) string {
+	if meta.Config.RequestTimeout > 0 {
+		return fmt.Sprintf("%ds", meta.Config.RequestTimeout)
+	}
+	if config.RelayTimeout > 0 {
+		return fmt.Sprintf("%ds", config.RelayTimeout)
+	}
+	return "the configured limit"
 }

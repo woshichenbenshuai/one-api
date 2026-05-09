@@ -32,6 +32,7 @@ const originInputs = {
 
 const originConfig = {
   responses_compat: false,
+  request_timeout: 0,
 };
 
 const EditChannel = () => {
@@ -61,6 +62,11 @@ const EditChannel = () => {
   };
 
   const handleConfigChange = (e, { name, value }) => {
+    if (name === 'request_timeout') {
+      const nextValue = value === '' ? 0 : parseInt(value, 10);
+      setConfig((prev) => ({ ...prev, [name]: Number.isNaN(nextValue) ? 0 : nextValue }));
+      return;
+    }
     setConfig((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -309,6 +315,19 @@ const EditChannel = () => {
                     value: checked,
                   })
                 }
+              />
+            </Form.Field>
+            <Form.Field>
+              <Form.Input
+                type='number'
+                min='0'
+                step='1'
+                label='Upstream timeout (seconds, 0 = default)'
+                name='request_timeout'
+                placeholder='0'
+                onChange={handleConfigChange}
+                value={config.request_timeout}
+                autoComplete='new-password'
               />
             </Form.Field>
             {!isEdit && (

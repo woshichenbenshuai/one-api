@@ -13,6 +13,16 @@ var HTTPClient *http.Client
 var ImpatientHTTPClient *http.Client
 var UserContentRequestHTTPClient *http.Client
 
+func GetRelayHTTPClient(timeoutSeconds int) *http.Client {
+	if timeoutSeconds <= 0 || HTTPClient == nil {
+		return HTTPClient
+	}
+	return &http.Client{
+		Timeout:   time.Duration(timeoutSeconds) * time.Second,
+		Transport: HTTPClient.Transport,
+	}
+}
+
 func Init() {
 	if config.UserContentRequestProxy != "" {
 		logger.SysLog(fmt.Sprintf("using %s as proxy to fetch user content", config.UserContentRequestProxy))

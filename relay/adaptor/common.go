@@ -1,6 +1,7 @@
 package adaptor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -9,6 +10,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/meta"
 	"io"
 	"net/http"
+	"time"
 )
 
 func SetupCommonRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) {
@@ -38,11 +40,28 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
 	}
+	requestContext := c.Request.Context()
+	cancel := func() {}
+	if meta.Config.RequestTimeout > 0 {
+		requestContext, cancel = context.WithTimeout(
+			requestContext,
+			time.Duration(meta.Config.RequestTimeout)*time.Second,
+		)
+		logger.Infof(
+			requestContext,
+			"using channel request timeout: %ds (channel_id=%d model=%s)",
+			meta.Config.RequestTimeout,
+			meta.ChannelId,
+			meta.ActualModelName,
+		)
+	}
+	defer cancel()
+	req = req.WithContext(requestContext)
 	err = a.SetupRequestHeader(c, req, meta)
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
-	resp, err := DoRequest(c, req)
+	resp, err := DoRequest(c, req, meta)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
@@ -59,8 +78,9 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	return resp, nil
 }
 
-func DoRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
-	resp, err := client.HTTPClient.Do(req)
+func DoRequest(c *gin.Context, req *http.Request, meta *meta.Meta) (*http.Response, error) {
+	relayHTTPClient := client.GetRelayHTTPClient(meta.Config.RequestTimeout)
+	resp, err := relayHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
