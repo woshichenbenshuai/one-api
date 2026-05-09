@@ -312,6 +312,7 @@ func ResponsesToChatHandler(c *gin.Context, resp *http.Response, promptTokens in
 	if err != nil {
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
+	logger.Infof(c.Request.Context(), "responses compat raw json response: %s", truncateResponseLog(string(responseBody), 4000))
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
@@ -369,6 +370,13 @@ func ResponsesToChatHandler(c *gin.Context, resp *http.Response, promptTokens in
 }
 
 func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName string, promptTokens int) (*model.ErrorWithStatusCode, string, *model.Usage) {
+	contentType := resp.Header.Get("Content-Type")
+	logger.Infof(c.Request.Context(), "responses compat stream content-type: %s", contentType)
+	if strings.HasPrefix(contentType, "application/json") {
+		logger.Infof(c.Request.Context(), "responses compat stream fallback: upstream returned JSON, converting to stream chunks")
+		return ResponsesJSONToChatStreamHandler(c, resp, modelName, promptTokens)
+	}
+
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -389,6 +397,7 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		logger.Infof(c.Request.Context(), "responses compat raw stream line: %s", truncateResponseLog(line, 4000))
 		if strings.HasPrefix(line, eventPrefix) {
 			eventType = strings.TrimSpace(strings.TrimPrefix(line, eventPrefix))
 			continue
@@ -702,6 +711,133 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 	return nil, responseText.String(), usage
 }
 
+func ResponsesJSONToChatStreamHandler(c *gin.Context, resp *http.Response, modelName string, promptTokens int) (*model.ErrorWithStatusCode, string, *model.Usage) {
+	var response ResponsesResponse
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+	logger.Infof(c.Request.Context(), "responses compat raw json-stream fallback response: %s", truncateResponseLog(string(responseBody), 4000))
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+	if response.Error.Type != "" {
+		return &model.ErrorWithStatusCode{
+			Error:      response.Error,
+			StatusCode: resp.StatusCode,
+		}, "", nil
+	}
+
+	common.SetEventStreamHeaders(c)
+
+	responseID := response.ID
+	if responseID == "" {
+		responseID = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
+	}
+	createdAt := time.Now().Unix()
+	outputText := response.OutputText()
+	message, finishReason := responsesOutputToChatMessage(response.Output)
+	usage := response.Usage.ToUsage()
+	if usage == nil || usage.TotalTokens == 0 {
+		usage = ResponseText2Usage(outputText, modelName, promptTokens)
+	}
+
+	logger.Infof(
+		c.Request.Context(),
+		"responses compat json->stream summary: output_items=%d text_len=%d finish_reason=%s usage_total=%d",
+		len(response.Output),
+		len(outputText),
+		finishReason,
+		usage.TotalTokens,
+	)
+
+	err = render.ObjectData(c, ChatCompletionsStreamResponse{
+		Id:      responseID,
+		Object:  "chat.completion.chunk",
+		Created: createdAt,
+		Model:   modelName,
+		Choices: []ChatCompletionsStreamResponseChoice{{
+			Index: 0,
+			Delta: model.Message{
+				Role: "assistant",
+			},
+		}},
+	})
+	if err != nil {
+		return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+
+	if text := message.StringContent(); text != "" {
+		err = render.ObjectData(c, ChatCompletionsStreamResponse{
+			Id:      responseID,
+			Object:  "chat.completion.chunk",
+			Created: createdAt,
+			Model:   modelName,
+			Choices: []ChatCompletionsStreamResponseChoice{{
+				Index: 0,
+				Delta: model.Message{
+					Content: text,
+				},
+			}},
+		})
+		if err != nil {
+			return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), "", nil
+		}
+	}
+
+	if len(message.ToolCalls) > 0 {
+		err = render.ObjectData(c, ChatCompletionsStreamResponse{
+			Id:      responseID,
+			Object:  "chat.completion.chunk",
+			Created: createdAt,
+			Model:   modelName,
+			Choices: []ChatCompletionsStreamResponseChoice{{
+				Index: 0,
+				Delta: model.Message{
+					ToolCalls: message.ToolCalls,
+				},
+			}},
+		})
+		if err != nil {
+			return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), "", nil
+		}
+	}
+
+	err = render.ObjectData(c, ChatCompletionsStreamResponse{
+		Id:      responseID,
+		Object:  "chat.completion.chunk",
+		Created: createdAt,
+		Model:   modelName,
+		Choices: []ChatCompletionsStreamResponseChoice{{
+			Index:        0,
+			Delta:        model.Message{},
+			FinishReason: &finishReason,
+		}},
+	})
+	if err != nil {
+		return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+
+	err = render.ObjectData(c, ChatCompletionsStreamResponse{
+		Id:      responseID,
+		Object:  "chat.completion.chunk",
+		Created: createdAt,
+		Model:   modelName,
+		Choices: []ChatCompletionsStreamResponseChoice{},
+		Usage:   usage,
+	})
+	if err != nil {
+		return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+	render.Done(c)
+	return nil, outputText, usage
+}
+
 type responsesStreamPayload struct {
 	Type        string                `json:"type,omitempty"`
 	ID          string                `json:"id,omitempty"`
@@ -804,4 +940,11 @@ func getOrCreateToolCallState(states map[int]*responsesToolCallState, event *res
 	}
 	states[event.OutputIndex] = state
 	return state
+}
+
+func truncateResponseLog(input string, limit int) string {
+	if len(input) <= limit {
+		return input
+	}
+	return input[:limit] + "...(truncated)"
 }

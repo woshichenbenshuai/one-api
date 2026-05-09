@@ -49,10 +49,12 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	if meta.UseResponsesCompat {
 		logger.Infof(
 			c.Request.Context(),
-			"responses compat upstream response: status=%d (model=%s)",
+			"responses compat upstream response: status=%d content_type=%s (model=%s)",
 			resp.StatusCode,
+			resp.Header.Get("Content-Type"),
 			meta.ActualModelName,
 		)
+		logger.Infof(c.Request.Context(), "responses compat upstream headers: %v", resp.Header)
 	}
 	return resp, nil
 }

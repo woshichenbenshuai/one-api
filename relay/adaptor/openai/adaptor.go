@@ -70,6 +70,9 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) error {
 	adaptor.SetupCommonRequestHeader(c, req, meta)
+	if meta.UseResponsesCompat && meta.IsStream {
+		req.Header.Set("Accept", "text/event-stream")
+	}
 	if meta.ChannelType == channeltype.Azure {
 		req.Header.Set("api-key", meta.APIKey)
 		return nil
