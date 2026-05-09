@@ -448,7 +448,28 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 				}},
 			})
 		case "response.output_item.added", "response.output_item.done":
-			if event.Item == nil || event.Item.Type != "function_call" {
+			if event.Item == nil {
+				continue
+			}
+			if event.Item.Type != "function_call" {
+				if eventType == "response.output_item.done" {
+					text := responseItemText(*event.Item)
+					if text != "" && responseText.Len() == 0 {
+						responseText.WriteString(text)
+						err = render.ObjectData(c, ChatCompletionsStreamResponse{
+							Id:      responseID,
+							Object:  "chat.completion.chunk",
+							Created: createdAt,
+							Model:   modelName,
+							Choices: []ChatCompletionsStreamResponseChoice{{
+								Index: 0,
+								Delta: model.Message{
+									Content: text,
+								},
+							}},
+						})
+					}
+				}
 				continue
 			}
 			sawToolCall = true
@@ -544,6 +565,28 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 				if event.RawResponse.Usage != nil {
 					usage = event.RawResponse.Usage.ToUsage()
 				}
+				if responseText.Len() == 0 {
+					text := event.RawResponse.OutputText()
+					if text != "" {
+						responseText.WriteString(text)
+						err = render.ObjectData(c, ChatCompletionsStreamResponse{
+							Id:      responseID,
+							Object:  "chat.completion.chunk",
+							Created: createdAt,
+							Model:   modelName,
+							Choices: []ChatCompletionsStreamResponseChoice{{
+								Index: 0,
+								Delta: model.Message{
+									Content: text,
+								},
+							}},
+						})
+					}
+				}
+			}
+			if err != nil {
+				_ = resp.Body.Close()
+				return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), "", nil
 			}
 			continue
 		default:
