@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common/client"
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"io"
@@ -73,7 +74,9 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 			resp.Header.Get("Content-Type"),
 			meta.ActualModelName,
 		)
-		logger.Infof(c.Request.Context(), "responses compat upstream headers: %v", resp.Header)
+		if config.DebugEnabled {
+			logger.Infof(c.Request.Context(), "responses compat upstream headers: %v", resp.Header)
+		}
 	}
 	return resp, nil
 }

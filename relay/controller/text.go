@@ -132,7 +132,9 @@ func getResponsesCompatRequestBody(c *gin.Context, meta *meta.Meta, textRequest 
 		textRequest.Stream,
 		meta.PromptTokens,
 	)
-	logger.Infof(c.Request.Context(), "responses compat request preview: %s", truncateForLog(string(jsonData), 1200))
+	if config.DebugEnabled {
+		logger.Infof(c.Request.Context(), "responses compat request preview: %s", truncateForLog(string(jsonData), 1200))
+	}
 	return bytes.NewBuffer(jsonData), nil
 }
 
@@ -190,7 +192,9 @@ func getConvertedRequestBody(c *gin.Context, meta *meta.Meta, textRequest *model
 			textRequest.Stream,
 			meta.PromptTokens,
 		)
-		logger.Infof(c.Request.Context(), "responses compat request preview: %s", truncateForLog(string(jsonData), 1200))
+		if config.DebugEnabled {
+			logger.Infof(c.Request.Context(), "responses compat request preview: %s", truncateForLog(string(jsonData), 1200))
+		}
 	}
 	logger.Debugf(c.Request.Context(), "converted request: \n%s", string(jsonData))
 	return bytes.NewBuffer(jsonData), nil

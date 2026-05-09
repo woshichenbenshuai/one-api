@@ -14,9 +14,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/songquanpeng/one-api/common"
-	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/common/conv"
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
 )
@@ -312,7 +313,9 @@ func ResponsesToChatHandler(c *gin.Context, resp *http.Response, promptTokens in
 	if err != nil {
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
-	logger.Infof(c.Request.Context(), "responses compat raw json response: %s", truncateResponseLog(string(responseBody), 4000))
+	if config.DebugEnabled {
+		logger.Infof(c.Request.Context(), "responses compat raw json response: %s", truncateResponseLog(string(responseBody), 4000))
+	}
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
@@ -397,7 +400,9 @@ func ResponsesToChatStreamHandler(c *gin.Context, resp *http.Response, modelName
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		logger.Infof(c.Request.Context(), "responses compat raw stream line: %s", truncateResponseLog(line, 4000))
+		if config.DebugEnabled {
+			logger.Infof(c.Request.Context(), "responses compat raw stream line: %s", truncateResponseLog(line, 4000))
+		}
 		if strings.HasPrefix(line, eventPrefix) {
 			eventType = strings.TrimSpace(strings.TrimPrefix(line, eventPrefix))
 			continue
@@ -721,7 +726,9 @@ func ResponsesJSONToChatStreamHandler(c *gin.Context, resp *http.Response, model
 	if err != nil {
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), "", nil
 	}
-	logger.Infof(c.Request.Context(), "responses compat raw json-stream fallback response: %s", truncateResponseLog(string(responseBody), 4000))
+	if config.DebugEnabled {
+		logger.Infof(c.Request.Context(), "responses compat raw json-stream fallback response: %s", truncateResponseLog(string(responseBody), 4000))
+	}
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), "", nil
