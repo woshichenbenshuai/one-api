@@ -112,9 +112,13 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	if meta.UseResponsesCompat {
 		if meta.IsStream {
-			return ResponsesToChatStreamHandler(c, resp, meta.ActualModelName, meta.PromptTokens)
+			var responseText string
+			err, responseText, usage = ResponsesToChatStreamHandler(c, resp, meta.ActualModelName, meta.PromptTokens)
+			_ = responseText
+			return
 		}
-		return ResponsesToChatHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		err, usage = ResponsesToChatHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
+		return
 	}
 	if meta.IsStream {
 		var responseText string
