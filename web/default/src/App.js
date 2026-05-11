@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useContext, useEffect } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import Loading from './components/Loading';
 import User from './pages/User';
 import { PrivateRoute } from './components/PrivateRoute';
@@ -27,7 +27,6 @@ import Chat from './pages/Chat';
 import LarkOAuth from './components/LarkOAuth';
 import Dashboard from './pages/Dashboard';
 
-const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
 
 function App() {
@@ -98,7 +97,7 @@ function App() {
         path='/'
         element={
           <Suspense fallback={<Loading></Loading>}>
-            <Home />
+            {userState.user ? <Navigate to='/token' replace /> : <LoginForm />}
           </Suspense>
         }
       />
